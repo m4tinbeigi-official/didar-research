@@ -196,7 +196,7 @@ function dr_render_dashboard() {
 }
 
 // ==========================================
-// ۳. هندلر خروجی و ورودی (CSV)
+// ۳. هندل خروجی و ورودی (CSV)
 // ==========================================
 add_action('admin_post_dr_export_csv', 'dr_handle_export_csv');
 function dr_handle_export_csv() {
@@ -263,10 +263,52 @@ add_shortcode('didar_research_form', 'dr_frontend_form');
 function dr_frontend_form() {
     // Enqueue Assets for Datepicker
     wp_enqueue_style('dr-font', 'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
-    wp_enqueue_style('persian-datepicker', 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css', array(), '1.2.0');
-    // persian-datepicker@1.2.0 requires the legacy persian-date package (0.1.x), not 1.x.
-    wp_enqueue_script('persian-date', 'https://cdn.jsdelivr.net/npm/persian-date@0.1.8/dist/persian-date.min.js', array('jquery'), '0.1.8', true);
-    wp_enqueue_script('persian-datepicker', 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js', array('jquery', 'persian-date'), '1.2.0', true);
+    wp_enqueue_style('dr-persian-datepicker', 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css', array(), '1.2.0');
+
+    // Load in document <head> to ensure the shortcode inline script can initialize safely.
+    wp_register_script('dr-persian-date', 'https://cdn.jsdelivr.net/npm/persian-date@0.1.8/dist/persian-date.min.js', array('jquery'), '0.1.8', false);
+    wp_register_script('dr-persian-datepicker', 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js', array('jquery', 'dr-persian-date'), '1.2.0', false);
+    wp_enqueue_script('dr-persian-date');
+    wp_enqueue_script('dr-persian-datepicker');
+
+    $dr_persiandate_shim_js = <<<'JS'
+(function(w, $) {
+    if (!w || !$ || !w.persianDate) {
+        return;
+    }
+
+    if (typeof w.persianDate.extend !== 'function' && typeof $.extend === 'function') {
+        w.persianDate.extend = $.extend;
+    }
+})(window, window.jQuery);
+JS;
+    wp_add_inline_script('dr-persian-datepicker', $dr_persiandate_shim_js, 'before');
+
+    $dr_datepicker_init_js = <<<'JS'
+jQuery(function($) {
+    const $dateInput = $('#p_date_input');
+    if (!$dateInput.length) {
+        return;
+    }
+
+    if (typeof $.fn.persianDatepicker === 'function' && typeof window.persianDate !== 'undefined') {
+        try {
+            $dateInput.persianDatepicker({
+                format: 'YYYY/MM/DD',
+                initialValue: true,
+                autoClose: true
+            });
+        } catch (e) {
+            $dateInput.prop('readonly', false).attr('placeholder', '1403/01/01');
+            console.error('Datepicker initialization failed. Falling back to manual input.', e);
+        }
+    } else {
+        $dateInput.prop('readonly', false).attr('placeholder', '1403/01/01');
+        console.error('persianDatepicker is not loaded. Falling back to manual input.');
+    }
+});
+JS;
+    wp_add_inline_script('dr-persian-datepicker', $dr_datepicker_init_js, 'after');
 
     ob_start(); ?>
     
@@ -351,9 +393,19 @@ function dr_frontend_form() {
                             <input type="text" name="shop_name" class="dr-input" required>
                         </div>
                         <div class="dr-group">
-                            <label class="dr-label">شهر / منطقه</label>
-                            <input type="text" name="location_city" class="dr-input" placeholder="مثال: تهران - بازار بزرگ">
+                            <label class="dr-label">بازه زمانی مراجعه *</label>
+                            <select name="visit_time_period" class="dr-select" required>
+                                <option value="">انتخاب کنید</option>
+                                <option value="صبح">صبح</option>
+                                <option value="ظهر">ظهر</option>
+                                <option value="شب">شب</option>
+                            </select>
                         </div>
+                    </div>
+
+                    <div class="dr-group">
+                        <label class="dr-label">شهر / منطقه</label>
+                        <input type="text" name="location_city" class="dr-input" placeholder="مثال: تهران - بازار بزرگ">
                     </div>
                     
                     <div class="dr-group">
@@ -461,27 +513,14 @@ function dr_frontend_form() {
 
     <script>
     jQuery(document).ready(function($) {
-        // 1. Setup Solar Datepicker
-        if (typeof $.fn.persianDatepicker === 'function') {
-            $('#p_date_input').persianDatepicker({
-                format: 'YYYY/MM/DD',
-                initialValue: true,
-                autoClose: true
-            });
-        } else {
-            // Safe fallback in case CDN/script is blocked.
-            $('#p_date_input').prop('readonly', false).attr('placeholder', '1403/01/01');
-            console.error('persianDatepicker is not loaded. Falling back to manual input.');
-        }
-
-        // 2. Get GPS
+        // 1. Get GPS
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(function(position) {
                 $('#sys_gps').val(position.coords.latitude + "," + position.coords.longitude);
             });
         }
 
-        // 3. Form Submission
+        // 2. Form Submission
         $('#drForm').on('submit', function(e) {
             e.preventDefault();
             let btn = $('#finalSubmit');
@@ -517,7 +556,7 @@ function dr_frontend_form() {
         // Simple Validation
         if(step > 1) {
             let currentStep = step - 1;
-            let inputs = document.querySelectorAll(`#step-${currentStep} input[required]`);
+            let inputs = document.querySelectorAll(`#step-${currentStep} input[required], #step-${currentStep} select[required], #step-${currentStep} textarea[required]`);
             for(let input of inputs) {
                 if(!input.value) {
                     alert('لطفا فیلدهای ضروری را پر کنید.');
