@@ -271,6 +271,33 @@ function dr_frontend_form() {
     wp_enqueue_script('dr-persian-date');
     wp_enqueue_script('dr-persian-datepicker');
 
+
+    $dr_datepicker_init_js = <<<'JS'
+jQuery(function($) {
+    const $dateInput = $('#p_date_input');
+    if (!$dateInput.length) {
+        return;
+    }
+
+    if (typeof $.fn.persianDatepicker === 'function' && typeof window.persianDate !== 'undefined') {
+        try {
+            $dateInput.persianDatepicker({
+                format: 'YYYY/MM/DD',
+                initialValue: true,
+                autoClose: true
+            });
+        } catch (e) {
+            $dateInput.prop('readonly', false).attr('placeholder', '1403/01/01');
+            console.error('Datepicker initialization failed. Falling back to manual input.', e);
+        }
+    } else {
+        $dateInput.prop('readonly', false).attr('placeholder', '1403/01/01');
+        console.error('persianDatepicker is not loaded. Falling back to manual input.');
+    }
+});
+JS;
+    wp_add_inline_script('dr-persian-datepicker', $dr_datepicker_init_js, 'after');
+
     ob_start(); ?>
     
     <style>
@@ -474,27 +501,14 @@ function dr_frontend_form() {
 
     <script>
     jQuery(document).ready(function($) {
-        // 1. Setup Solar Datepicker
-        if (typeof $.fn.persianDatepicker === 'function' && typeof window.persianDate !== 'undefined') {
-            $('#p_date_input').persianDatepicker({
-                format: 'YYYY/MM/DD',
-                initialValue: true,
-                autoClose: true
-            });
-        } else {
-            // Safe fallback in case CDN/script is blocked.
-            $('#p_date_input').prop('readonly', false).attr('placeholder', '1403/01/01');
-            console.error('persianDatepicker is not loaded. Falling back to manual input.');
-        }
-
-        // 2. Get GPS
+        // 1. Get GPS
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(function(position) {
                 $('#sys_gps').val(position.coords.latitude + "," + position.coords.longitude);
             });
         }
 
-        // 3. Form Submission
+        // 2. Form Submission
         $('#drForm').on('submit', function(e) {
             e.preventDefault();
             let btn = $('#finalSubmit');
