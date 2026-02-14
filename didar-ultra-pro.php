@@ -271,6 +271,18 @@ function dr_frontend_form() {
     wp_enqueue_script('dr-persian-date');
     wp_enqueue_script('dr-persian-datepicker');
 
+    $dr_persiandate_shim_js = <<<'JS'
+(function(w, $) {
+    if (!w || !$ || !w.persianDate) {
+        return;
+    }
+
+    if (typeof w.persianDate.extend !== 'function' && typeof $.extend === 'function') {
+        w.persianDate.extend = $.extend;
+    }
+})(window, window.jQuery);
+JS;
+    wp_add_inline_script('dr-persian-datepicker', $dr_persiandate_shim_js, 'before');
 
     $dr_datepicker_init_js = <<<'JS'
 jQuery(function($) {
