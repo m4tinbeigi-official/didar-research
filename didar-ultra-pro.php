@@ -354,9 +354,19 @@ function dr_frontend_form() {
                             <input type="text" name="shop_name" class="dr-input" required>
                         </div>
                         <div class="dr-group">
-                            <label class="dr-label">شهر / منطقه</label>
-                            <input type="text" name="location_city" class="dr-input" placeholder="مثال: تهران - بازار بزرگ">
+                            <label class="dr-label">بازه زمانی مراجعه *</label>
+                            <select name="visit_time_period" class="dr-select" required>
+                                <option value="">انتخاب کنید</option>
+                                <option value="صبح">صبح</option>
+                                <option value="ظهر">ظهر</option>
+                                <option value="شب">شب</option>
+                            </select>
                         </div>
+                    </div>
+
+                    <div class="dr-group">
+                        <label class="dr-label">شهر / منطقه</label>
+                        <input type="text" name="location_city" class="dr-input" placeholder="مثال: تهران - بازار بزرگ">
                     </div>
                     
                     <div class="dr-group">
@@ -520,7 +530,7 @@ function dr_frontend_form() {
         // Simple Validation
         if(step > 1) {
             let currentStep = step - 1;
-            let inputs = document.querySelectorAll(`#step-${currentStep} input[required]`);
+            let inputs = document.querySelectorAll(`#step-${currentStep} input[required], #step-${currentStep} select[required], #step-${currentStep} textarea[required]`);
             for(let input of inputs) {
                 if(!input.value) {
                     alert('لطفا فیلدهای ضروری را پر کنید.');
