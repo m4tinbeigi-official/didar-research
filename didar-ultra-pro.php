@@ -263,9 +263,16 @@ add_shortcode('didar_research_form', 'dr_frontend_form');
 function dr_frontend_form() {
     // Enqueue Assets for Datepicker
     wp_enqueue_style('dr-font', 'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
-    wp_enqueue_style('persian-datepicker', 'https://unpkg.com/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css');
-    wp_enqueue_script('persian-date', 'https://unpkg.com/persian-date@1.1.0/dist/persian-date.min.js', array('jquery'), null, true);
-    wp_enqueue_script('persian-datepicker', 'https://unpkg.com/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js', array('jquery', 'persian-date'), null, true);
+    wp_enqueue_style('dr-persian-datepicker', 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css', array(), '1.2.0');
+
+    // Avoid handle collisions with themes/plugins and force the compatible legacy persian-date for this datepicker.
+    if (wp_script_is('persian-date', 'registered') || wp_script_is('persian-date', 'enqueued')) {
+        wp_deregister_script('persian-date');
+    }
+    wp_register_script('dr-persian-date', 'https://cdn.jsdelivr.net/npm/persian-date@0.1.8/dist/persian-date.min.js', array(), '0.1.8', true);
+    wp_register_script('dr-persian-datepicker', 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js', array('jquery', 'dr-persian-date'), '1.2.0', true);
+    wp_enqueue_script('dr-persian-date');
+    wp_enqueue_script('dr-persian-datepicker');
 
     ob_start(); ?>
     
@@ -460,12 +467,28 @@ function dr_frontend_form() {
 
     <script>
     jQuery(document).ready(function($) {
-        // 1. Setup Solar Datepicker
-        $('#p_date_input').persianDatepicker({
-            format: 'YYYY/MM/DD',
-            initialValue: true,
-            autoClose: true
-        });
+        // 1. Setup Solar Datepicker (with small retry window for late-loaded scripts)
+        const initSolarDatepicker = function(retry = 0) {
+            if (typeof $.fn.persianDatepicker === 'function' && typeof window.persianDate !== 'undefined') {
+                $('#p_date_input').persianDatepicker({
+                    format: 'YYYY/MM/DD',
+                    initialValue: true,
+                    autoClose: true
+                });
+                return;
+            }
+
+            if (retry < 10) {
+                setTimeout(function() { initSolarDatepicker(retry + 1); }, 100);
+                return;
+            }
+
+            // Safe fallback in case CDN/script is blocked.
+            $('#p_date_input').prop('readonly', false).attr('placeholder', '1403/01/01');
+            console.error('persianDatepicker is not loaded. Falling back to manual input.');
+        };
+
+        initSolarDatepicker();
 
         // 2. Get GPS
         if (navigator.geolocation) {
